@@ -3,7 +3,8 @@ Created on Thu Jan  2 15:59:19 2020
 
 @author: pedri
 """
-#dashboard version 8: importing new stuff to show real data 
+#dashboard version 9: callback for the time of comparison on the main graph
+#attempting to add a rebalance functionality
 
 import dash
 import dash_core_components as dcc
@@ -25,17 +26,48 @@ import plotly.express as px
 
 
 #Enter the tickers for the companies held in the portfolio:
-securities=['SBUX','NEE','TSLA','ADBE','GOOGL','REI']
+securities=[
+"ALXN",
+"PEP",
+"TMUS",
+"WM",
+"NEE",
+"CVS",
+"DG",
+"IIPR",
+"DD",
+"BABA",
+"DHI",
+"AWAY",
+"VFH",
+"STIP"]
 
 #Enter the number of shares bought in each company:
-nShares=[5,6,3,7,9,20]
+nShares=[
+13,
+38,
+43,
+45,
+69,
+60,
+18,
+9,
+29,
+21,
+9,
+119,
+23,
+48,
+]
 
 #Enter the amount of cash reserves, if any:
 cash=0
 
 #Enter the date of the investment in the format 'yyyy-mm-dd':
-investmentDate='2018-1-1'
+investmentDate='2020-02-13'
 
+#In case the action is only adding or removing specific securities set it to True:
+rebalance=False
 
 
 ######################################
@@ -43,9 +75,10 @@ investmentDate='2018-1-1'
 
 #Data Preparation:
 
-
 port= fin.createPortfolio(securities, start=investmentDate)
 hist=fin.portHistPerformance(port, nShares=nShares)
+
+
 indivRtns= fin.portIndivRtns(port)
 
 sp500= web.DataReader('^GSPC', 'yahoo', start=investmentDate)['Adj Close']
@@ -53,6 +86,21 @@ sp500.dropna(0, inplace=True)
 
 hist['SP500']=sp500.values
 hist=fin.normalize(hist)
+
+
+#In case of rebalancing or buying/selling the stock 
+if rebalance:
+    port= fin.portRebalance()
+    hist=fin.portHistPerformance(port, nShares=nShares)
+    indivRtns= fin.portIndivRtns(port)
+    
+    sp500= web.DataReader('^GSPC', 'yahoo', start=investmentDate)['Adj Close']
+    sp500.dropna(0, inplace=True)
+    
+    hist['SP500']=sp500.values
+    hist=fin.normalize(hist)
+    
+
 
 totInvested=np.sum((port.iloc[-1]*nShares).values)
 latestVals=port.iloc[-1].values*nShares
@@ -65,6 +113,7 @@ d={'Securities':port.columns.values,
    'Weight(%)':[round(j*100, 3) for j in wghts],
    'Return(%)':[round(v*100, 2) for v in indivRtns.values],
    }
+
 df=pd.DataFrame(d)
 
 ####################
@@ -82,9 +131,34 @@ values = [round(j*100, 3) for j in wghts]
 dta=[go.Pie(labels=labels, values=values)]
 
 
-groups=['Energy','Utilities','Technology','Consumer Discretionary','Consumer Cyclical']
-val=[0.1,19.9,45,5,30]
+groups=[
+'Healthcare',
+'Consumer Staples',
+'Telecommunications',
+'Utilities',
+'Real Estate',
+'Consumer Discretionary',
+'Financials',
+'Transportation',
+'Fixed Income',
+'Industrials',
+'Basic Materials']
+
+val=[
+0.120,
+0.170,
+0.100,
+0.100,
+0.050,
+0.100,
+0.040,
+0.080,
+0.100,
+0.100,
+0.040]
+
 dta2=[go.Pie(labels=groups, values=val)]
+
 
 
 
@@ -93,7 +167,10 @@ totRtn=(hist.iloc[-1,0]-hist.iloc[0,0])/hist.iloc[0,0]
 totRsk=fin.portExpectedVolatility(port, wghts)
 bta= fin.getPortBeta(port, wghts)
 shrp= fin.portSharpe(port, wghts)
-divYld=fin.portDivYield(port, nShares=nShares)
+try:
+    divYld=fin.portDivYield(port, nShares=nShares)
+except:
+    divYld=0 
 totAsst=totInvested
 reb=investmentDate
 
